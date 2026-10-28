@@ -1,0 +1,1083 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<!-- "Add to Home Screen" opens it without browser bars (iPhones can't go full screen otherwise). -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Luke Vision">
+<title>Luke Vision</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 112'%3E%3Cpath d='M60 30 40 8M60 30 82 5' stroke='%23f2ecdd' stroke-width='6' stroke-linecap='round'/%3E%3Crect x='6' y='28' width='108' height='74' rx='18' fill='%237a3e1d'/%3E%3Crect x='18' y='40' width='66' height='50' rx='11' fill='%231d3fd0'/%3E%3Ccircle cx='98' cy='56' r='7' fill='%23f2ecdd'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --ink: #0f1320;
+    --ink-deep: #070910;
+    --paper: #f2ecdd;
+    --mint: #4ff0c0;
+    --magenta: #ff3d9a;
+    --dim: rgba(242, 236, 221, 0.62);
+    --font: Bahnschrift, "Segoe UI", sans-serif;
+    --safe-y: max(5vh, env(safe-area-inset-top), env(safe-area-inset-bottom));
+    --safe-x: max(5vw, env(safe-area-inset-left), env(safe-area-inset-right));
+  }
+  /* Phones and tablets don't need TV-safe margins, only room for notches. */
+  html.touch {
+    --safe-y: max(1.5vh, env(safe-area-inset-top), env(safe-area-inset-bottom));
+    --safe-x: max(2vw, env(safe-area-inset-left), env(safe-area-inset-right));
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  /* The pointer hides unless the mouse is moving. */
+  html:not(.cursor) *, html:not(.cursor) *::before, html:not(.cursor) *::after { cursor: none !important; }
+  html.cursor button, html.cursor .g-cell, html.cursor .g-chan { cursor: pointer; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #000; color: var(--paper);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;   /* no pull-to-refresh */
+    touch-action: manipulation;  /* no double-tap zoom */
+  }
+
+  video {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    object-fit: contain; background: #000;
+    touch-action: none;          /* swipes change the channel */
+  }
+
+  /* Tap targets: the OSD's touch controls and the guide's touch buttons. */
+  .ctl {
+    pointer-events: auto; flex: 1 1 0; min-width: 4.5em; min-height: 2.9rem;
+    font: inherit; font-size: clamp(1rem, 1.8vw, 1.5rem); font-weight: 700; letter-spacing: .1em;
+    color: var(--paper); background: rgba(255, 255, 255, .08);
+    border: 2px solid rgba(79, 240, 192, .55); border-radius: .5rem; padding: .5em .6em;
+  }
+  .ctl:active { background: var(--mint); color: var(--ink); }
+
+  /* Every overlay keeps 5% TV-safe margins. */
+  .overlay {
+    position: fixed; inset: 0;
+    padding: var(--safe-y) var(--safe-x);
+    pointer-events: none;
+    opacity: 0; visibility: hidden;
+    transition: opacity .35s ease, visibility 0s linear .35s;
+  }
+  .overlay.show { opacity: 1; visibility: visible; transition: opacity .2s ease, visibility 0s; }
+
+  /* CRT scanlines for the "furniture" screens. */
+  .scan::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, .22) 2px 4px);
+  }
+
+  /* ---------- splash ---------- */
+  #splash {
+    z-index: 50;
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(ellipse at 50% 42%, #1c2440 0%, var(--ink) 55%, var(--ink-deep) 100%);
+  }
+  .splash-inner { position: relative; z-index: 1; }
+  .kicker {
+    font-size: clamp(.9rem, 1.6vw, 1.5rem); letter-spacing: .4em; text-transform: uppercase;
+    color: var(--mint); margin-bottom: .6em;
+  }
+  /* Logo: a wood-cabinet TV with a glowing blue screen, plus the LUKE VISION wordmark. */
+  .logo {
+    display: flex; align-items: center; justify-content: center; gap: .18em;
+    font-size: clamp(2.8rem, 10vw, 9.5rem);
+  }
+  .logo-tv { width: 1.25em; height: 1.17em; flex: none; filter: drop-shadow(0 .05em .12em rgba(0, 0, 0, .6)); }
+  #splash h1 {
+    margin: 0; line-height: .9; font-size: 1em;
+    font-weight: 700; font-stretch: condensed; letter-spacing: .04em; white-space: nowrap;
+  }
+  .lw-luke { text-shadow: -.035em 0 rgba(255, 61, 79, .85), .035em 0 rgba(61, 123, 255, .85); }
+  .lw-vision {
+    margin-left: .2em; font-style: italic; color: #ffd23f;
+    text-shadow: .04em .04em 0 #000, 0 0 .3em rgba(255, 210, 63, .35);
+  }
+  .bars {
+    height: clamp(.25rem, .45vw, .45rem); margin: 1.2em auto 1.4em; width: min(70vw, 42rem);
+    background: #ffd23f; box-shadow: 0 0 .8em rgba(255, 210, 63, .45);
+  }
+  .prompt {
+    margin: 0; font-size: clamp(1.3rem, 2.8vw, 2.6rem); letter-spacing: .08em;
+    animation: blink 1.1s steps(2, start) infinite;
+  }
+  .msg { margin: .8em 0 0; font-size: clamp(1rem, 1.8vw, 1.6rem); color: var(--dim); }
+  .msg.err { color: var(--magenta); }
+  @keyframes blink { to { visibility: hidden; } }
+
+  /* ---------- station bug ---------- */
+  #bug {
+    z-index: 10; padding: var(--safe-y) var(--safe-x);
+    display: flex; justify-content: flex-end; align-items: flex-start;
+  }
+  #bug span {
+    font-weight: 700; font-stretch: condensed; font-size: clamp(1rem, 2vw, 1.8rem);
+    letter-spacing: .12em; color: var(--paper); opacity: .45;
+    display: inline-flex; align-items: center; gap: .3em;
+  }
+  #bug svg { width: 1.6em; height: 1.5em; }
+  #bug.show { opacity: 1; }
+
+  /* ---------- static / no signal ---------- */
+  #static {
+    z-index: 20;
+    display: flex; align-items: center; justify-content: center;
+    background-color: #1a1d26; background-size: 160px 160px;
+    animation: noise .45s steps(5) infinite;
+  }
+  #static::before { content: ""; position: absolute; inset: 0; background: rgba(15, 19, 32, .55); }
+  #static-text {
+    position: relative; font-size: clamp(2rem, 6vw, 5.5rem); font-weight: 700; font-stretch: condensed;
+    letter-spacing: .12em; color: var(--paper);
+    text-shadow: -.04em 0 var(--magenta), .04em 0 var(--mint);
+  }
+  @keyframes noise {
+    0% { background-position: 0 0; } 20% { background-position: -57px 31px; }
+    40% { background-position: 83px -12px; } 60% { background-position: -21px -77px; }
+    80% { background-position: 44px 66px; } 100% { background-position: 0 0; }
+  }
+
+  /* ---------- OSD ---------- */
+  #osd { z-index: 30; display: flex; align-items: flex-end; }
+  .osd-bar {
+    width: 100%;
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+    gap: clamp(.8rem, 2vw, 2.2rem);
+    padding: clamp(.8rem, 1.6vw, 1.6rem) clamp(1rem, 2.2vw, 2.2rem);
+    background: linear-gradient(to bottom, rgba(15, 19, 32, .94), rgba(9, 12, 21, .94));
+    border-top: .3rem solid var(--mint);
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, .55);
+  }
+  .osd-num {
+    font-size: clamp(3rem, 8vw, 7.5rem); font-weight: 700; font-stretch: condensed; line-height: .85;
+    color: var(--mint); font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 .35em rgba(79, 240, 192, .35);
+  }
+  .osd-meta { min-width: 0; }
+  .osd-name {
+    font-size: clamp(1rem, 2vw, 1.9rem); letter-spacing: .22em; text-transform: uppercase; color: var(--mint);
+  }
+  .osd-cdesc {
+    font-size: clamp(.85rem, 1.5vw, 1.35rem); color: var(--dim); font-style: italic;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .osd-cdesc:empty { display: none; }
+  .osd-title {
+    font-size: clamp(1.5rem, 3.4vw, 3.2rem); font-weight: 600; line-height: 1.1; margin-top: .1em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .osd-note { font-size: clamp(.95rem, 1.7vw, 1.5rem); color: var(--magenta); margin-top: .25em; }
+  .osd-note:empty { display: none; }
+  .osd-side { text-align: right; font-variant-numeric: tabular-nums; }
+  .osd-clock { font-size: clamp(1.4rem, 3vw, 2.8rem); font-weight: 600; }
+  .osd-left { font-size: clamp(.95rem, 1.7vw, 1.5rem); color: var(--dim); }
+  .osd-ctrl { grid-column: 1 / -1; display: none; flex-wrap: wrap; gap: .6rem; }
+  #osd.controls .osd-ctrl { display: flex; }
+
+  /* ---------- guide: an old cable guide on a CRT in a wood cabinet ---------- */
+  #guide {
+    z-index: 40;
+    --g-yellow: #ffd23f; --g-cyan: #8ff3ff; --g-white: #fdf8e8; --g-red: #ff4a3d;
+    --g-cell-hi: #2e56e6; --g-cell-lo: #1b36b4; --g-chan-hi: #c8323b; --g-chan-lo: #8a1a22;
+    color: var(--g-white);
+    /* The 5% safe margin becomes the TV cabinet. */
+    background:
+      repeating-linear-gradient(100deg, rgba(0, 0, 0, .12) 0 3px, transparent 3px 11px),
+      linear-gradient(160deg, #6b3f1d, #3a210d 60%, #24140a);
+  }
+  #guide.show { pointer-events: auto; }  /* tap shows, scroll the list */
+  #guide.scan::after { display: none; }  /* scanlines live on the screen, not the cabinet */
+  .guide-wrap {
+    position: relative; height: 100%; display: flex; flex-direction: column;
+    padding: clamp(.7rem, 1.8vw, 1.8rem) clamp(.9rem, 2.4vw, 2.4rem);
+    border-radius: clamp(1rem, 2.6vw, 2.6rem); overflow: hidden;
+    background: radial-gradient(ellipse at 50% 35%, #1d3fd0 0%, #0f249a 50%, #07125a 100%);
+    box-shadow: 0 0 0 clamp(.3rem, .5vw, .5rem) #141414, inset 0 0 6vw rgba(0, 0, 0, .65);
+    text-shadow: 0 0 .35em rgba(143, 243, 255, .35);
+  }
+  /* Scanlines plus a little glass glare. */
+  .guide-wrap::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+    background:
+      radial-gradient(ellipse at 25% 8%, rgba(255, 255, 255, .1), transparent 45%),
+      repeating-linear-gradient(to bottom, transparent 0 2px, rgba(0, 0, 0, .2) 2px 4px);
+  }
+  .guide-head {
+    position: relative; display: flex; align-items: center; justify-content: space-between; gap: 1em;
+    padding-bottom: .55em; margin-bottom: .7em;
+  }
+  .guide-head::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: clamp(.2rem, .35vw, .35rem);
+    background: var(--g-yellow); box-shadow: 0 0 .5em rgba(255, 210, 63, .5);
+  }
+  .guide-brand {
+    display: flex; align-items: center; gap: .35em;
+    font-size: clamp(1.6rem, 3.6vw, 3.4rem); font-weight: 700; font-stretch: condensed; letter-spacing: .06em;
+  }
+  .guide-brand svg { width: 1.3em; height: 1.2em; flex: none; }
+  .guide-brand em { font-style: normal; color: var(--g-yellow); }
+  .guide-clock {
+    font-size: clamp(1.3rem, 2.8vw, 2.6rem); font-variant-numeric: tabular-nums; color: var(--g-yellow);
+    background: #000; padding: .1em .5em; border-radius: .2em; box-shadow: inset 0 0 0 2px rgba(255, 210, 63, .4);
+  }
+  /* Info bar: the highlighted show. */
+  .info {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 clamp(.8rem, 2vw, 2rem);
+    align-items: center; margin-bottom: .8em;
+    background: rgba(0, 0, 0, .35); padding: clamp(.4rem, .9vw, .9rem); border-radius: .4rem;
+  }
+  .i-cover {
+    position: relative; height: clamp(5rem, 17vh, 13rem); aspect-ratio: 4 / 3;
+    background: #000; border: .2rem solid var(--g-yellow); border-radius: .5rem; overflow: hidden;
+  }
+  .i-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .i-cover span {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    font-size: clamp(1.8rem, 4.5vw, 4rem); font-weight: 700; font-stretch: condensed; color: var(--g-yellow);
+  }
+  .i-cover.noimg img { display: none; }
+  .i-cover.noimg span { display: flex; }
+  .i-text { min-width: 0; }
+  .i-title {
+    font-size: clamp(1.3rem, 2.8vw, 2.7rem); font-weight: 700; line-height: 1.1; color: var(--g-yellow);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .i-when { font-size: clamp(.9rem, 1.6vw, 1.5rem); color: var(--g-cyan); font-variant-numeric: tabular-nums; margin: .25em 0; }
+  .i-when b {
+    color: var(--g-white); background: linear-gradient(var(--g-chan-hi), var(--g-chan-lo));
+    font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    padding: .05em .45em; border-radius: .2em; margin-right: .7em; text-shadow: none;
+  }
+  .i-desc {
+    font-size: clamp(.9rem, 1.6vw, 1.5rem); line-height: 1.35; color: rgba(253, 248, 232, .85);
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  }
+
+  /* Listings grid: channels down the side, time across the top. */
+  .grid-head, .g-row { display: grid; grid-template-columns: clamp(9rem, 22vw, 21rem) minmax(0, 1fr); }
+  .grid-head {
+    font-size: clamp(.85rem, 1.5vw, 1.35rem); font-weight: 700; color: var(--g-yellow);
+    height: 1.8em; line-height: 1.8em; margin-bottom: .2em; font-variant-numeric: tabular-nums;
+    background: rgba(0, 0, 0, .55);
+  }
+  .grid-head > span { padding-left: .6em; color: var(--g-cyan); letter-spacing: .15em; }
+  .g-times { position: relative; }
+  .g-times span { position: absolute; top: 0; padding-left: .4em; border-left: 2px solid rgba(255, 210, 63, .6); white-space: nowrap; }
+  #guide-list {
+    list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0;
+    overflow-y: auto; scrollbar-width: none;
+    touch-action: pan-y; overscroll-behavior: contain;  /* sideways swipes page the time instead */
+  }
+  #guide-list::-webkit-scrollbar { display: none; }
+  .g-row { font-size: clamp(1rem, 1.9vw, 1.8rem); height: 2.3em; margin-bottom: .15em; }
+  /* Beveled "buttons", like character-generator graphics. */
+  .g-chan, .g-cell { box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .35), inset -2px -2px 0 rgba(0, 0, 0, .45); }
+  .g-chan {
+    display: flex; align-items: center; gap: .5em; min-width: 0; padding: 0 .5em; margin-right: .15em;
+    background: linear-gradient(var(--g-chan-hi), var(--g-chan-lo)); border-left: .3em solid transparent;
+  }
+  .g-row.current .g-chan { border-left-color: var(--g-yellow); }
+  .g-row.selrow .g-chan { background: linear-gradient(#e8505a, #b0262f); }
+  .g-num { font-weight: 700; font-stretch: condensed; color: var(--g-yellow); font-variant-numeric: tabular-nums; }
+  .g-name { font-size: .85em; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-track { position: relative; overflow: hidden; }
+  .g-cell {
+    position: absolute; top: 0; bottom: 0; padding: 0 .5em; line-height: 2.3em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    background: linear-gradient(var(--g-cell-hi), var(--g-cell-lo)); background-clip: padding-box;
+    border-left: .15em solid transparent;
+  }
+  .g-cell.tiny { padding: 0; }
+  .g-cell.sel {
+    background: linear-gradient(#ffe680, #f5b700); background-clip: padding-box;
+    color: #0a1450; font-weight: 700; text-shadow: none;
+  }
+  .g-nowline { position: absolute; top: 0; bottom: 0; width: .14em; background: var(--g-red); box-shadow: 0 0 .4em var(--g-red); z-index: 1; }
+  .guide-foot {
+    position: relative; z-index: 3;  /* above the glass, so the buttons take taps */
+    padding-top: .7em; margin-top: .4em;
+    border-top: 2px solid rgba(255, 255, 255, .2);
+    font-size: clamp(.9rem, 1.6vw, 1.5rem); color: var(--g-cyan);
+  }
+  .g-hints { display: flex; flex-wrap: wrap; gap: .4em 2em; }
+  .g-tbtns { display: none; gap: .5em; }
+  html.touch .g-hints { display: none; }
+  html.touch .g-tbtns { display: flex; }
+  .g-tbtns .ctl {
+    color: var(--g-white); text-shadow: none; border-color: var(--g-yellow);
+    background: linear-gradient(var(--g-cell-hi), var(--g-cell-lo)); min-width: 0;
+  }
+  .g-tbtns .ctl:active { background: var(--g-yellow); color: #0a1450; }
+  .guide-foot b { color: var(--g-white); font-weight: 700; }
+  .btn-a { color: #6cd64a !important; } .btn-b { color: #ff5a4e !important; }
+
+  /* ---------- small screens ---------- */
+  @media (max-width: 700px) {
+    .kicker { letter-spacing: .18em; }
+    .osd-num { font-size: 2.6rem; }
+    .osd-name { letter-spacing: .1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .guide-brand { font-size: 1.3rem; white-space: nowrap; }
+    .guide-clock { font-size: 1.1rem; white-space: nowrap; }
+    .i-when b { letter-spacing: .04em; margin-right: .4em; }
+    .osd-bar { gap: .7rem; }
+    .grid-head, .g-row { grid-template-columns: clamp(6rem, 30vw, 9rem) minmax(0, 1fr); }
+    .g-name { font-size: .75em; }
+    .i-cover { height: 4.6rem; }
+    .i-desc { -webkit-line-clamp: 3; font-size: .85rem; }
+    .g-tbtns .ctl { font-size: .9rem; letter-spacing: .04em; padding: .5em .2em; }
+  }
+  /* Phones on their side: little height, so shrink the header and info bar. */
+  @media (max-height: 520px) {
+    .guide-head { padding-bottom: .3em; margin-bottom: .4em; }
+    .guide-brand { font-size: 1.3rem; }
+    .guide-clock { font-size: 1.1rem; }
+    .info { margin-bottom: .4em; padding: .3rem; }
+    .i-cover { height: 3.6rem; }
+    .i-title { font-size: 1.15rem; }
+    .i-when, .i-desc { font-size: .85rem; }
+    .i-desc { -webkit-line-clamp: 1; }
+    .g-row { font-size: .95rem; }
+    .guide-foot { padding-top: .4em; }
+    .ctl { min-height: 2.5rem; padding: .3em .5em; }
+  }
+</style>
+</head>
+<body>
+
+<!-- The Luke Vision TV logo, drawn once and reused with <use href="#lv-tv">. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="lv-glow" cx="45%" cy="40%" r="70%">
+      <stop offset="0" stop-color="#4f7dff"/><stop offset=".55" stop-color="#1d3fd0"/><stop offset="1" stop-color="#0a1a78"/>
+    </radialGradient>
+    <symbol id="lv-tv" viewBox="0 0 120 112">
+      <g stroke="#f2ecdd" stroke-width="4" stroke-linecap="round">
+        <line x1="60" y1="30" x2="40" y2="8"/><line x1="60" y1="30" x2="82" y2="5"/>
+        <line x1="26" y1="102" x2="20" y2="109"/><line x1="94" y1="102" x2="100" y2="109"/>
+      </g>
+      <circle cx="40" cy="8" r="4.5" fill="#ffd23f"/><circle cx="82" cy="5" r="4.5" fill="#ffd23f"/>
+      <rect x="6" y="28" width="108" height="74" rx="18" fill="#7a3e1d" stroke="#f2ecdd" stroke-width="4"/>
+      <!-- A glowing blue CRT screen, like the guide's. -->
+      <rect x="18" y="40" width="66" height="50" rx="11" fill="url(#lv-glow)" stroke="#1a0d05" stroke-width="3"/>
+      <path d="M26 47 Q40 43 54 46" stroke="#fff" stroke-opacity=".35" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <text x="51" y="76" text-anchor="middle" font-family="Bahnschrift, 'Segoe UI', sans-serif"
+            font-weight="700" font-size="28" fill="#fdf8e8" stroke="#1a0d05" stroke-width="5"
+            paint-order="stroke" letter-spacing="1">LV</text>
+      <circle cx="98" cy="50" r="6" fill="#f2ecdd"/><circle cx="98" cy="68" r="6" fill="#f2ecdd"/>
+      <rect x="91" y="80" width="14" height="3" rx="1.5" fill="#f2ecdd"/>
+      <rect x="91" y="86" width="14" height="3" rx="1.5" fill="#f2ecdd"/>
+    </symbol>
+  </defs>
+</svg>
+
+<video id="video" playsinline preload="auto"></video>
+
+<div id="bug" class="overlay"><span><svg aria-hidden="true"><use href="#lv-tv"/></svg>LUKE&nbsp;VISION</span></div>
+
+<div id="static" class="overlay"><div id="static-text"></div></div>
+
+<div id="osd" class="overlay">
+  <div class="osd-bar">
+    <div class="osd-num" id="osd-num">01</div>
+    <div class="osd-meta">
+      <div class="osd-name" id="osd-name"></div>
+      <div class="osd-cdesc" id="osd-cdesc"></div>
+      <div class="osd-title" id="osd-title"></div>
+      <div class="osd-note" id="osd-note"></div>
+    </div>
+    <div class="osd-side">
+      <div class="osd-clock" id="osd-clock"></div>
+      <div class="osd-left" id="osd-left"></div>
+    </div>
+    <div class="osd-ctrl">
+      <button class="ctl" data-act="down">CH &#9660;</button>
+      <button class="ctl" data-act="guide">GUIDE</button>
+      <button class="ctl" data-act="up">CH &#9650;</button>
+      <button class="ctl" data-act="full" id="ctl-full" hidden>FULL</button>
+    </div>
+  </div>
+</div>
+
+<div id="guide" class="overlay scan">
+  <div class="guide-wrap">
+    <div class="guide-head">
+      <div class="guide-brand"><svg aria-hidden="true"><use href="#lv-tv"/></svg>LUKE VISION <em>GUIDE</em></div>
+      <div class="guide-clock" id="guide-clock"></div>
+    </div>
+    <div class="info">
+      <div class="i-cover" id="i-cover"><img id="i-img" alt=""><span id="i-num"></span></div>
+      <div class="i-text">
+        <div class="i-title" id="i-title"></div>
+        <div class="i-when" id="i-when"></div>
+        <div class="i-desc" id="i-desc"></div>
+      </div>
+    </div>
+    <div class="grid-head"><span>CH</span><div class="g-times" id="g-times"></div></div>
+    <ul id="guide-list"></ul>
+    <div class="guide-foot">
+      <div class="g-hints">
+        <span><b>&#9650;&#9660;</b> Channel</span>
+        <span><b>&#9664;&#9654;</b> Later / earlier</span>
+        <span><b class="btn-a">A</b> Tune</span>
+        <span><b class="btn-b">B</b> Close</span>
+      </div>
+      <!-- Touch screens: tap a show to pick it, tap it again (or Watch) to tune in. -->
+      <div class="g-tbtns">
+        <button class="ctl" data-act="earlier">&#9664; EARLIER</button>
+        <button class="ctl" data-act="later">LATER &#9654;</button>
+        <button class="ctl" data-act="ok">WATCH</button>
+        <button class="ctl" data-act="back">CLOSE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="splash" class="overlay scan show">
+  <div class="splash-inner">
+    <div class="kicker">Broadcasting from the Internet Archive</div>
+    <div class="logo">
+      <svg class="logo-tv" aria-hidden="true"><use href="#lv-tv"/></svg>
+      <h1><span class="lw-luke">LUKE</span><span class="lw-vision">VISION</span></h1>
+    </div>
+    <div class="bars"></div>
+    <p class="prompt" id="splash-prompt" hidden>Press A or Enter to tune in</p>
+    <p class="msg" id="splash-msg">Loading channels&hellip;</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const video = $('video');
+  const els = {
+    splash: $('splash'), prompt: $('splash-prompt'), msg: $('splash-msg'),
+    bug: $('bug'), stat: $('static'), statText: $('static-text'),
+    osd: $('osd'), osdNum: $('osd-num'), osdName: $('osd-name'), osdTitle: $('osd-title'),
+    osdNote: $('osd-note'), osdClock: $('osd-clock'), osdLeft: $('osd-left'),
+    guide: $('guide'), guideList: $('guide-list'), guideClock: $('guide-clock'),
+    gTimes: $('g-times'), osdCdesc: $('osd-cdesc'),
+    iCover: $('i-cover'), iImg: $('i-img'), iNum: $('i-num'),
+    iTitle: $('i-title'), iWhen: $('i-when'), iDesc: $('i-desc'), ctlFull: $('ctl-full'),
+  };
+  const root = document.documentElement;
+
+  const STORE_KEY = 'channelzero.lastChannel';
+  const OSD_MS = 4000;
+  const OSD_CTRL_MS = 7000;       // the OSD stays longer when it shows touch controls
+  const SWIPE_MIN = 50;           // px a finger must travel to count as a swipe
+  const ERROR_SKIP_MS = 2000;     // pause on "NO SIGNAL" before skipping a broken item
+  const SLOT_GRACE = 3;           // seconds a video may overrun its scheduled slot
+  const DRIFT_MAX = 10;           // re-seek if playback drifts this far from the schedule
+  const PAD_DEDUPE_MS = 250;      // ignore emulated key/click events right after a pad press
+  const GUIDE_WIN = 90 * 60;      // guide shows 90 minutes at a time (60 on a phone)...
+  const GUIDE_STEP = 30 * 60;     // ...in half-hour columns...
+  const GUIDE_AHEAD = 12 * 3600;  // ...and scrolls up to 12 hours ahead
+
+  let channels = [];              // [{name, items:[{id,title,dur,url}], total}]
+  const state = {
+    loading: false, started: false, ch: 0, idx: 0, startWall: 0, token: 0,
+    // Guide: selected channel, a time inside the selected show, and the window's left edge.
+    guideOpen: false, sel: 0, selT: 0, winStart: 0, needsUnmute: false,
+  };
+  let guideRows = [];             // [{li, track}] per channel
+  let osdTimer = 0;
+  let lastPadAt = -Infinity;
+  let touchMode = false;          // a touch screen: show tap controls and tap wording
+
+  const now = () => Date.now() / 1000;
+  const guideWin = () => (innerWidth < 700 ? 60 * 60 : GUIDE_WIN);
+  const promptText = () => (touchMode ? 'Tap to ' : 'Press A or Enter to ') +
+    (channels.length ? 'tune in' : 'retry');
+
+  function setTouchMode() {
+    if (touchMode) return;
+    touchMode = true;
+    root.classList.add('touch');
+    els.prompt.textContent = promptText();
+    renderOSD();
+  }
+  const chNum = (i) => String(i + 1).padStart(2, '0');
+  const clockText = (t = now()) => new Date(t * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const leftText = (s) => `${Math.max(1, Math.ceil(s / 60))} min`;
+
+  // ---------- catalog ----------
+
+  // Catalogs built before covers were added: derive the cover from the archive.org identifier.
+  function archiveThumb(it) {
+    return it.id && /^https:\/\/archive\.org\//.test(it.url)
+      ? `https://archive.org/services/img/${encodeURIComponent(it.id)}` : '';
+  }
+
+  async function loadCatalog() {
+    if (state.loading) return;
+    state.loading = true;
+    els.prompt.hidden = true;
+    els.msg.classList.remove('err');
+    els.msg.textContent = 'Loading channels…';
+    try {
+      const res = await fetch('catalog.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      channels = (Array.isArray(data) ? data : []).map((c) => {
+        const items = (c && Array.isArray(c.items) ? c.items : [])
+          .filter((it) => it && it.url && Number(it.dur) > 0)
+          .map((it) => ({
+            ...it, title: String(it.title || it.id || 'Untitled'), dur: Number(it.dur),
+            desc: String(it.desc || ''), thumb: String(it.thumb || archiveThumb(it)),
+          }));
+        return {
+          name: String((c && c.name) || 'Untitled'), desc: String((c && c.desc) || ''),
+          items, total: items.reduce((s, it) => s + it.dur, 0),
+        };
+      }).filter((c) => c.items.length);
+    } catch (e) {
+      channels = [];
+    }
+    state.loading = false;
+    if (channels.length) {
+      els.msg.textContent = `${channels.length} channel${channels.length === 1 ? '' : 's'} on the air`;
+      buildGuide();
+    } else {
+      els.msg.textContent = 'No channels found. Run build_catalog.py first.';
+      els.msg.classList.add('err');
+    }
+    els.prompt.textContent = promptText();
+    els.prompt.hidden = false;
+  }
+
+  // ---------- schedule ----------
+
+  // What is "on" right now: the same answer for every viewer at the same wall-clock time.
+  function whatsOn(ch, t = now()) {
+    const c = channels[ch];
+    let pos = t % c.total;
+    for (let i = 0; i < c.items.length; i++) {
+      const it = c.items[i];
+      if (pos < it.dur) return { index: i, offset: pos, item: it };
+      pos -= it.dur;
+    }
+    return { index: 0, offset: 0, item: c.items[0] };  // float rounding at the very end
+  }
+
+  // The show airing at time t, with its wall-clock start and end.
+  function showAt(ch, t) {
+    const on = whatsOn(ch, t);
+    return { item: on.item, index: on.index, start: t - on.offset, end: t - on.offset + on.item.dur };
+  }
+
+  // Every show that overlaps [a, b).
+  function showsBetween(ch, a, b) {
+    const items = channels[ch].items;
+    let s = showAt(ch, a);
+    const list = [s];
+    while (s.end < b) {
+      const index = (s.index + 1) % items.length;
+      s = { item: items[index], index, start: s.end, end: s.end + items[index].dur };
+      list.push(s);
+    }
+    return list;
+  }
+
+  // ---------- playback ----------
+
+  function tune(ch) {
+    ch = (ch + channels.length) % channels.length;
+    state.ch = ch;
+    try { localStorage.setItem(STORE_KEY, String(ch)); } catch (e) { /* storage unavailable */ }
+    const on = whatsOn(ch);
+    playItem(on.index, now() - on.offset);
+    showOSD();
+  }
+
+  // startWall = wall-clock second at which this item's position 0 "aired".
+  function playItem(idx, startWall) {
+    const item = channels[state.ch].items[idx];
+    state.idx = idx;
+    state.startWall = startWall;
+    state.token++;
+    showStatic('');
+    video.src = item.url;
+    const p = video.play();
+    if (p && p.catch) p.catch(onPlayRejected);
+    renderOSD();
+  }
+
+  function onPlayRejected(err) {
+    if (!err || err.name !== 'NotAllowedError') return;  // AbortError etc. from fast channel flips
+    // Autoplay with sound refused: play muted and ask for a press to unmute.
+    video.muted = true;
+    state.needsUnmute = true;
+    video.play().catch(() => {});
+    showOSD();
+  }
+
+  function advance() {
+    const items = channels[state.ch].items;
+    const next = (state.idx + 1) % items.length;
+    const on = whatsOn(state.ch);
+    // Join the next item at its scheduled offset if it is on air now; otherwise start it fresh.
+    playItem(next, on.index === next ? now() - on.offset : now());
+  }
+
+  function resync() {
+    const on = whatsOn(state.ch);
+    playItem(on.index, now() - on.offset);
+  }
+
+  video.addEventListener('loadedmetadata', () => {
+    const off = now() - state.startWall;
+    const d = video.duration;
+    if (off <= 1) return;
+    if (isFinite(d) && off >= d - 1) {
+      // File is shorter than the catalog says; play it from the top and let the schedule catch up.
+      state.startWall = now();
+      return;
+    }
+    video.currentTime = off;
+  });
+
+  video.addEventListener('playing', () => hideStatic());
+  video.addEventListener('ended', () => { if (state.started) advance(); });
+  video.addEventListener('error', () => {
+    if (!state.started || !video.getAttribute('src')) return;
+    const token = state.token;
+    showStatic('NO SIGNAL');
+    setTimeout(() => { if (token === state.token) advance(); }, ERROR_SKIP_MS);
+  });
+
+  function tryUnmute() {
+    if (!state.needsUnmute) return;
+    state.needsUnmute = false;
+    video.muted = false;
+    video.play().catch(() => {           // still no permission: stay muted rather than freeze
+      video.muted = true;
+      state.needsUnmute = true;
+      video.play().catch(() => {});
+      renderOSD();
+    });
+    renderOSD();
+  }
+
+  // Once a second: keep the clock honest and refresh the visible overlays.
+  setInterval(() => {
+    if (!state.started) return;
+    const item = channels[state.ch].items[state.idx];
+    const elapsed = now() - state.startWall;
+    if (elapsed > item.dur + SLOT_GRACE) {
+      resync();                          // scheduled slot is over; jump to what's on now
+    } else if (!video.paused && !video.seeking && video.readyState >= 3 &&
+               elapsed < (isFinite(video.duration) ? video.duration - 1 : Infinity) &&
+               Math.abs(video.currentTime - elapsed) > DRIFT_MAX) {
+      video.currentTime = elapsed;       // fell behind after buffering; catch up
+    }
+    if (els.osd.classList.contains('show')) renderOSD();
+    if (state.guideOpen) renderGuide();
+  }, 1000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && state.started) resync();
+  });
+
+  // ---------- overlays ----------
+
+  function showStatic(text) {
+    els.statText.textContent = text;
+    els.stat.classList.add('show');
+  }
+  function hideStatic() { els.stat.classList.remove('show'); }
+
+  function renderOSD() {
+    if (!channels.length) return;
+    const c = channels[state.ch];
+    const item = c.items[state.idx];
+    els.osdNum.textContent = chNum(state.ch);
+    els.osdName.textContent = c.name;
+    els.osdCdesc.textContent = c.desc;
+    els.osdTitle.textContent = item.title;
+    els.osdNote.textContent = !state.needsUnmute ? ''
+      : `Sound is off — ${touchMode ? 'tap' : 'press A'} to turn it on`;
+    els.osdClock.textContent = clockText();
+    els.osdLeft.textContent = `${leftText(item.dur - (now() - state.startWall))} left`;
+    els.ctlFull.hidden = !document.fullscreenEnabled || !!document.fullscreenElement;
+  }
+
+  // controls: also show the tap buttons. By default, keep them if they're already up.
+  function showOSD(controls = els.osd.classList.contains('show') && els.osd.classList.contains('controls')) {
+    renderOSD();
+    els.osd.classList.toggle('controls', controls);
+    els.osd.classList.add('show');
+    clearTimeout(osdTimer);
+    osdTimer = setTimeout(hideOSD, controls ? OSD_CTRL_MS : OSD_MS);
+  }
+  function hideOSD() {
+    clearTimeout(osdTimer);
+    els.osd.classList.remove('show');
+  }
+
+  function buildGuide() {
+    els.guideList.textContent = '';
+    guideRows = channels.map((c, i) => {
+      const li = document.createElement('li');
+      li.className = 'g-row';
+      li.dataset.ch = i;
+      li.innerHTML = '<span class="g-chan"><span class="g-num"></span><span class="g-name"></span></span>' +
+        '<div class="g-track"></div>';
+      li.querySelector('.g-num').textContent = chNum(i);
+      li.querySelector('.g-name').textContent = c.name;
+      els.guideList.appendChild(li);
+      return { li, track: li.querySelector('.g-track') };
+    });
+  }
+
+  const slotStart = (t) => Math.floor(t / GUIDE_STEP) * GUIDE_STEP;
+  const pct = (s) => `${(s / guideWin()) * 100}%`;
+
+  function renderGuide() {
+    const t = now();
+    // Time moves on while the guide is open: never select or show the past.
+    if (state.selT < t) state.selT = t;
+    if (state.winStart < slotStart(t)) state.winStart = slotStart(t);
+    const win = guideWin();
+    const a = state.winStart, b = a + win;
+    els.guideClock.textContent = clockText(t);
+
+    els.gTimes.textContent = '';
+    for (let s = a; s < b; s += GUIDE_STEP) {
+      const label = document.createElement('span');
+      label.style.left = pct(s - a);
+      label.textContent = clockText(s);
+      els.gTimes.appendChild(label);
+    }
+
+    const sel = showAt(state.sel, state.selT);
+    guideRows.forEach(({ li, track }, i) => {
+      li.classList.toggle('current', i === state.ch);
+      li.classList.toggle('selrow', i === state.sel);
+      track.textContent = '';
+      for (const show of showsBetween(i, a, b)) {
+        const s = Math.max(show.start, a), e = Math.min(show.end, b);
+        if (e <= s) continue;
+        const cell = document.createElement('div');
+        cell.className = 'g-cell';
+        cell.dataset.start = show.start;
+        cell.style.left = pct(s - a);
+        cell.style.width = pct(e - s);
+        // Slivers (a few minutes wide) get no text; it would spill over the next cell.
+        if (e - s >= win * 0.05) cell.textContent = (show.start < a ? '‹ ' : '') + show.item.title;
+        else cell.classList.add('tiny');
+        if (i === state.sel && Math.abs(show.start - sel.start) < 0.5) cell.classList.add('sel');
+        track.appendChild(cell);
+      }
+      if (t >= a && t < b) {
+        const line = document.createElement('div');
+        line.className = 'g-nowline';
+        line.style.left = pct(t - a);
+        track.appendChild(line);
+      }
+    });
+    renderInfo(sel, t);
+  }
+
+  function renderInfo(show, t) {
+    const item = show.item;
+    els.iTitle.textContent = item.title;
+    els.iWhen.innerHTML = '<b></b>';
+    els.iWhen.firstChild.textContent = `${chNum(state.sel)} ${channels[state.sel].name}`;
+    els.iWhen.append(show.start <= t
+      ? `On now · ${leftText(show.end - t)} left`
+      : `${clockText(show.start)} – ${clockText(show.end)}`);
+    els.iDesc.textContent = item.desc || channels[state.sel].desc;
+    els.iNum.textContent = chNum(state.sel);
+    // Only touch the image when the show changes, so the once-a-second refresh doesn't reload it.
+    if (els.iImg.dataset.src !== item.thumb) {
+      els.iImg.dataset.src = item.thumb;
+      els.iCover.classList.toggle('noimg', !item.thumb);
+      if (item.thumb) els.iImg.src = item.thumb; else els.iImg.removeAttribute('src');
+    }
+  }
+  els.iImg.addEventListener('load', () => els.iCover.classList.remove('noimg'));
+  els.iImg.addEventListener('error', () => els.iCover.classList.add('noimg'));
+
+  function openGuide() {
+    state.guideOpen = true;
+    state.sel = state.ch;
+    state.selT = now();
+    state.winStart = slotStart(state.selT);
+    hideOSD();
+    renderGuide();
+    els.guide.classList.add('show');
+    scrollSelection();
+  }
+  function closeGuide() {
+    state.guideOpen = false;
+    els.guide.classList.remove('show');
+  }
+  // Up/down keeps the same time, so you land on whatever airs then on the other channel.
+  function moveSelection(delta) {
+    state.sel = (state.sel + delta + channels.length) % channels.length;
+    renderGuide();
+    scrollSelection();
+  }
+  // Left/right steps to the previous/next show on the selected channel.
+  function moveTime(dir) {
+    const t = now();
+    const show = showAt(state.sel, Math.max(state.selT, t));
+    if (dir > 0) {
+      if (show.end > t + GUIDE_AHEAD) return;
+      state.selT = show.end + 0.5;
+    } else {
+      if (show.start <= t) return;           // already on what's airing now
+      state.selT = Math.max(show.start - 0.5, t);
+    }
+    // Keep the selected show's start in view, scrolling the window in half-hour steps.
+    const win = guideWin();
+    const next = showAt(state.sel, state.selT);
+    const anchor = Math.max(next.start, state.selT - (win - GUIDE_STEP));
+    if (anchor < state.winStart) state.winStart = slotStart(anchor);
+    if (state.selT >= state.winStart + win) state.winStart = slotStart(state.selT) - (win - GUIDE_STEP);
+    state.winStart = Math.max(state.winStart, slotStart(t));
+    renderGuide();
+  }
+  // Touch: page the whole grid an hour (less a half-hour of overlap) at a time.
+  function pageTime(dir) {
+    const t = now(), win = guideWin();
+    const min = slotStart(t), max = slotStart(t + GUIDE_AHEAD) - (win - GUIDE_STEP);
+    state.winStart = Math.min(Math.max(state.winStart + dir * (win - GUIDE_STEP), min), Math.max(min, max));
+    state.selT = Math.max(state.winStart, t);  // select what's on at the new left edge
+    renderGuide();
+  }
+  function tuneSelection() {
+    closeGuide();
+    if (state.sel !== state.ch) tune(state.sel); else showOSD();
+  }
+  // A tap in the guide: a channel name tunes in; a show is selected, and tapping it again tunes in.
+  function guideTap(target) {
+    if (!target) return;
+    const t = now();
+    state.sel = target.ch;
+    if (target.start === undefined || target.selected) { tuneSelection(); return; }
+    state.selT = Math.max(target.start + 0.5, t);
+    renderGuide();
+  }
+  function scrollSelection() {
+    const li = els.guideList.children[state.sel];
+    if (li) li.scrollIntoView({ block: 'nearest' });
+  }
+
+  // ---------- start ----------
+
+  function start() {
+    if (!channels.length) { loadCatalog(); return; }
+    state.started = true;
+    els.splash.classList.remove('show');
+    els.bug.classList.add('show');
+    // A history entry to absorb the browser's Back (Xbox B button) instead of leaving the page.
+    try { history.pushState({ channelZero: true }, ''); } catch (e) { /* ignore */ }
+    const fs = document.documentElement.requestFullscreen;
+    if (fs) fs.call(document.documentElement).catch(() => {});
+    let ch = 0;
+    try {
+      const saved = parseInt(localStorage.getItem(STORE_KEY), 10);
+      if (saved >= 0 && saved < channels.length) ch = saved;
+    } catch (e) { /* storage unavailable */ }
+    tune(ch);
+  }
+
+  // ---------- input ----------
+
+  function action(name, source) {
+    if (source !== 'pad' && performance.now() - lastPadAt < PAD_DEDUPE_MS) return;
+    if (!state.started) {
+      if (name === 'ok' && !state.loading) start();
+      return;
+    }
+    tryUnmute();
+    if (state.guideOpen) {
+      switch (name) {
+        case 'up': moveSelection(-1); break;
+        case 'down': moveSelection(1); break;
+        case 'left': moveTime(-1); break;
+        case 'right': moveTime(1); break;
+        case 'ok': tuneSelection(); break;
+        case 'earlier': pageTime(-1); break;
+        case 'later': pageTime(1); break;
+        case 'back':
+        case 'guide': closeGuide(); break;
+      }
+    } else {
+      switch (name) {
+        case 'up': tune(state.ch + 1); break;
+        case 'down': tune(state.ch - 1); break;
+        case 'ok':
+        case 'guide': openGuide(); break;
+        case 'back': hideOSD(); break;
+        case 'info':
+          if (els.osd.classList.contains('show')) hideOSD(); else showOSD();
+          break;
+      }
+    }
+  }
+
+  const KEYS = {
+    ArrowUp: 'up', PageUp: 'up', ArrowDown: 'down', PageDown: 'down',
+    ArrowLeft: 'left', ArrowRight: 'right',
+    Enter: 'ok', ' ': 'ok', Spacebar: 'ok',
+    Escape: 'back', Backspace: 'back', BrowserBack: 'back',
+    g: 'guide', G: 'guide', i: 'info', I: 'info',
+    // Key names some Xbox/TV browsers send for the controller.
+    GamepadA: 'ok', GamepadB: 'back', GamepadX: 'info', GamepadY: 'guide',
+    GamepadDPadUp: 'up', GamepadDPadDown: 'down', GamepadDPadLeft: 'left', GamepadDPadRight: 'right',
+    GamepadLeftShoulder: 'down', GamepadRightShoulder: 'up',
+    ChannelUp: 'up', ChannelDown: 'down',
+  };
+
+  window.addEventListener('keydown', (e) => {
+    const name = KEYS[e.key];
+    if (!name) return;
+    e.preventDefault();
+    if (e.repeat && !['up', 'down', 'left', 'right'].includes(name)) return;
+    action(name, 'key');
+  });
+
+  // Taps and clicks: on-screen buttons, guide cells, or (anywhere else) toggle the OSD's tap controls.
+  let guideTarget = null;         // what a press in the guide landed on (it redraws every second)
+  els.guide.addEventListener('pointerdown', (e) => {
+    const cell = e.target.closest('.g-cell'), row = e.target.closest('.g-row');
+    guideTarget = !row ? null : cell
+      ? { ch: +row.dataset.ch, start: +cell.dataset.start, selected: cell.classList.contains('sel') }
+      : e.target.closest('.g-chan') ? { ch: +row.dataset.ch } : null;
+  });
+  window.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (performance.now() - lastPadAt < PAD_DEDUPE_MS) return;  // emulated click from a pad press
+    const btn = e.target.closest('[data-act]');
+    if (!state.started) { action('ok', 'mouse'); return; }
+    if (btn && btn.dataset.act === 'full') {
+      tryUnmute();
+      root.requestFullscreen().catch(() => {}).then(() => renderOSD());
+      showOSD(true);
+    } else if (btn) {
+      action(btn.dataset.act, 'mouse');
+    } else if (state.guideOpen) {
+      tryUnmute();
+      guideTap(els.guide.contains(e.target) ? guideTarget : null);
+    } else {
+      tryUnmute();
+      if (els.osd.classList.contains('controls') && els.osd.classList.contains('show')) hideOSD();
+      else showOSD(true);
+    }
+    guideTarget = null;
+  });
+  // iOS only delivers taps on elements it considers clickable.
+  video.onclick = els.guide.onclick = () => {};
+  window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // Swipes: up/down while watching changes the channel; sideways in the guide pages through time.
+  let touchStart = null;
+  window.addEventListener('touchstart', (e) => {
+    const p = e.touches[0];
+    touchStart = e.touches.length === 1 ? { x: p.clientX, y: p.clientY } : null;
+  }, { passive: true });
+  window.addEventListener('touchend', (e) => {
+    const s = touchStart;
+    touchStart = null;
+    if (!s || !state.started) return;
+    const p = e.changedTouches[0];
+    const dx = p.clientX - s.x, dy = p.clientY - s.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_MIN) return;
+    if (state.guideOpen) {
+      if (Math.abs(dx) > Math.abs(dy) * 1.5) { tryUnmute(); pageTime(dx < 0 ? 1 : -1); }
+    } else if (Math.abs(dy) > Math.abs(dx) * 1.5 && !e.target.closest('button')) {
+      action(dy < 0 ? 'up' : 'down', 'touch');
+    }
+  }, { passive: true });
+
+  window.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || e.pointerType === 'pen') setTouchMode();
+  });
+  // Show the mouse pointer only while it moves.
+  let cursorTimer = 0;
+  window.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    root.classList.add('cursor');
+    clearTimeout(cursorTimer);
+    cursorTimer = setTimeout(() => root.classList.remove('cursor'), 2500);
+  });
+  window.addEventListener('resize', () => { if (state.guideOpen) renderGuide(); });
+  document.addEventListener('fullscreenchange', () => renderOSD());
+
+  window.addEventListener('popstate', () => {
+    if (!state.started) return;
+    try { history.pushState({ channelZero: true }, ''); } catch (e) { /* ignore */ }
+    action('back', 'history');
+  });
+
+  // Legacy Edge on Xbox: deliver raw gamepad input instead of mouse-cursor emulation.
+  try { if ('gamepadInputEmulation' in navigator) navigator.gamepadInputEmulation = 'gamepad'; } catch (e) { /* ignore */ }
+
+  const PAD_BUTTONS = {
+    0: 'ok', 1: 'back', 2: 'info', 3: 'guide', 4: 'down', 5: 'up',
+    12: 'up', 13: 'down', 14: 'left', 15: 'right',
+  };
+  const padPrev = {};
+
+  function pollPads() {
+    let pads = [];
+    try { pads = navigator.getGamepads ? navigator.getGamepads() : []; } catch (e) { /* blocked on insecure origins in some browsers */ }
+    for (const pad of pads) {
+      if (!pad) continue;
+      const prev = padPrev[pad.index] || {};
+      const cur = {};
+      for (const b in PAD_BUTTONS) {
+        const btn = pad.buttons[b];
+        cur[b] = !!btn && (btn.pressed || btn.value > 0.5);
+        if (cur[b] && !prev[b]) press(PAD_BUTTONS[b]);
+      }
+      // Left stick behaves like the D-pad (strongest axis wins), with hysteresis so it fires once per push.
+      const x = pad.axes[0] || 0, y = pad.axes[1] || 0;
+      const horiz = Math.abs(x) > Math.abs(y);
+      const v = Math.abs(horiz ? x : y);
+      cur.stick = v < 0.3 ? '' : v <= 0.6 ? (prev.stick || '')
+        : horiz ? (x < 0 ? 'left' : 'right') : (y < 0 ? 'up' : 'down');
+      if (cur.stick && cur.stick !== prev.stick) press(cur.stick);
+      padPrev[pad.index] = cur;
+    }
+    requestAnimationFrame(pollPads);
+  }
+  function press(name) {
+    lastPadAt = performance.now();
+    action(name, 'pad');
+  }
+
+  // ---------- boot ----------
+
+  (function makeNoise() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 160;
+    const g = c.getContext('2d');
+    const img = g.createImageData(160, 160);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = (Math.random() * 255) | 0;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    els.stat.style.backgroundImage = `url(${c.toDataURL()})`;
+  })();
+
+  if (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches) setTouchMode();
+  loadCatalog();
+  requestAnimationFrame(pollPads);
+})();
+</script>
+</body>
+</html>
